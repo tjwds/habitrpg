@@ -246,20 +246,26 @@ function closeChal(cid, broken, cb) {
     },
     function(_removed, cb2) {
       removed = _removed;
-      var pull = {'$pull':{}}; pull['$pull'][_removed._id] = 1;
+      var pull = {'$pull': {}};
+      pull['$pull'][_removed._id] = 1;
       Group.findByIdAndUpdate(_removed.group, pull);
-      User.find({_id:{$in: removed.members}}, cb2);
+
+      var update = _.reduce(removed.tasks, function (m, task, id) {
+        _.each(broken, function (v, k) {
+          m['$set'][task.type + 's.' + id + '.challenge.' + k] = v;
+        });
+        return m;
+      }, {'$set': {}});
+      User.update({_id: {$in: removed.members}}, update, cb2);
+    },
+    function() {
+      User.find({_id:{$in: removed.members}}, {tags:1}, arguments[arguments.length-1]);
     },
     function(users, cb2) {
       var parallel = [];
       _.each(users, function(user){
         var tag = _.find(user.tags, {id:cid});
         if (tag) tag.challenge = undefined;
-        _.each(user.tasks, function(task){
-          if (task.challenge && task.challenge.id == removed._id) {
-            _.merge(task.challenge, broken);
-          }
-        })
         parallel.push(function(cb3){
           user.save(cb3);
         })

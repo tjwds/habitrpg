@@ -22,6 +22,7 @@ var TaskSchema = {
   value: {type: Number, 'default': 0}, // redness
   priority: {type: Number, 'default': '1'},
   attribute: {type: String, 'default': "str", enum: ['str','con','int','per']},
+  sort: {type: Number, 'default': 0},
   challenge: {
     id: {type: 'String', ref:'Challenge'},
     broken: String, // CHALLENGE_DELETED, TASK_DELETED, UNSUBSCRIBED, CHALLENGE_CLOSED
@@ -97,8 +98,11 @@ var RewardSchema = new Schema(
 //  })
 //})
 
-module.exports.TaskSchema = TaskSchema;
 module.exports.HabitSchema = HabitSchema;
+module.exports.HabitModel = mongoose.model('Habit',HabitSchema);
 module.exports.DailySchema = DailySchema;
+module.exports.DailyModel = mongoose.model('Daily',DailySchema);
 module.exports.TodoSchema = TodoSchema;
+module.exports.TodoModel = mongoose.model('Todo',TodoSchema);
 module.exports.RewardSchema = RewardSchema;
+module.exports.RewardModel = mongoose.model('Reward',RewardSchema);

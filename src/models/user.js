@@ -9,6 +9,10 @@ var Schema = mongoose.Schema;
 var shared = require('habitrpg-shared');
 var _ = require('lodash');
 var TaskSchemas = require('./task');
+var Habit = TaskSchemas.HabitModel,
+  Daily = TaskSchemas.DailyModel,
+  Todo = TaskSchemas.TodoModel,
+  Reward = TaskSchemas.RewardModel
 var Challenge = require('./challenge').model;
 
 // User Schema
@@ -314,10 +318,11 @@ var UserSchema = new Schema({
 
   challenges: [{type: 'String', ref:'Challenge'}],
 
-  habits:   {type:[TaskSchemas.HabitSchema]},
-  dailys:   {type:[TaskSchemas.DailySchema]},
-  todos:    {type:[TaskSchemas.TodoSchema]},
-  rewards:  {type:[TaskSchemas.RewardSchema]},
+  habits:       Schema.Types.Mixed,
+  dailys:       Schema.Types.Mixed,
+  todos:        Schema.Types.Mixed,
+  completed:    Schema.Types.Mixed,
+  rewards:      Schema.Types.Mixed,
 
   extra: Schema.Types.Mixed
 
@@ -352,36 +357,44 @@ UserSchema.post('init', function(doc){
 })
 
 UserSchema.pre('save', function(next) {
+  var self = this;
 
   // Populate new users with default content
   if (this.isNew){
-    //TODO for some reason this doesn't work here: `_.merge(this, shared.content.userDefaults);`
-    var self = this;
-    _.each(['habits', 'dailys', 'todos', 'rewards', 'tags'], function(taskType){
-      self[taskType] = _.map(shared.content.userDefaults[taskType], function(task){
-        var newTask = _.cloneDeep(task);
-
-        // Render task's text and notes in user's language
-        if(taskType === 'tags'){
-          // tasks automatically get id=helpers.uuid() from TaskSchema id.default, but tags are Schema.Types.Mixed - so we need to manually invoke here
-          newTask.id = shared.uuid();
-          newTask.name = newTask.name(self.preferences.language);
-        }else{
-          newTask.text = newTask.text(self.preferences.language);
-          newTask.notes = newTask.notes(self.preferences.language);
-
-          if(newTask.checklist){
-            newTask.checklist = _.map(newTask.checklist, function(checklistItem){
-              checklistItem.text = checklistItem.text(self.preferences.language);
-              return checklistItem;
-            });
-          }
-        }
-
-        return newTask;
+    _.each(shared.content.userDefaults.tags, function(tag){
+      // tasks automatically get id=helpers.uuid() from TaskSchema id.default, but tags are Schema.Types.Mixed - so we need to manually invoke here
+      self.tags.push({
+        id: shared.uuid(),
+        name: tag.name(self.preferences.language)
       });
+    })
+    _.each(shared.content.userDefaults.tasks, function(arr,type){
+      // Note this careful use of _.defaults and immutability. Without this, the next user up would get a modified original value
+      self[type] = _.reduce(arr, function(m,t){
+        var validated = new (t.type=='habit' ? Habit : t.type=='daily' ? Daily : t.type=='todo' ? Todo : Reward)(
+          _.defaults({
+            // Render task's text and notes in user's language
+            text: t.text(self.preferences.language),
+            notes: t.notes(self.preferences.language),
+            checklist: t.checklist ?
+              _.map(t.checklist, function(checklistItem){
+                return _.defaults({text:checklistItem.text(self.preferences.language)}, checklistItem);
+              }) : undefined,
+          }, t)
+        );
+        m[validated.id] = validated;
+        return m;
+      }, {});
     });
   }
+
+  // Since you can't have a dictionary of subdocuments (only an array), this is our workaround to use TaskSchemas
+  // to validate on save (see http://goo.gl/9hpLAh)
+  _.each({habits:Habit,dailys:Daily,todos:Todo,rewards:Reward},function(k,model){
+    _.each(self[k], function(t){
+      t = new model(t);
+    });
+  });
 
   //this.markModified('tasks');
   if (_.isNaN(this.preferences.dayStart) || this.preferences.dayStart < 0 || this.preferences.dayStart > 23) {

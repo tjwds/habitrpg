@@ -17,12 +17,13 @@ conf.set "port", "1337"
 process.env.BASE_URL = conf.get("BASE_URL")
 process.env.FACEBOOK_KEY = conf.get("FACEBOOK_KEY")
 process.env.FACEBOOK_SECRET = conf.get("FACEBOOK_SECRET")
-process.env.NODE_DB_URI = "mongodb://localhost/habitrpg"
+process.env.NODE_DB_URI = "mongodb://localhost/habitrpg-test"
 User = require("../src/models/user").model
 Group = require("../src/models/group").model
 Challenge = require("../src/models/challenge").model
 app = require("../src/server")
 shared = require("habitrpg-shared")
+$i = shared.$i
 payments = require("../src/controllers/payments")
 
 # ###### Helpers & Variables ######
@@ -40,8 +41,7 @@ describe "API", ->
   apiToken = undefined
   username = undefined
   password = undefined
-  registerNewUser = (cb, main) ->
-    main = true  if main is `undefined`
+  registerNewUser = (cb, main=true) ->
     randomID = shared.uuid()
     username = password = randomID  if main
     request.post(baseURL + "/register").set("Accept", "application/json").send(
@@ -116,19 +116,19 @@ describe "API", ->
               op: "score"
               params:
                 direction: "up"
-                id: res.body.todos[0].id
+                id: $i(res.body.todos, 0).id
             }
             {
               op: "score"
               params:
                 direction: "up"
-                id: res.body.todos[1].id
+                id: $i(res.body.todos, 1).id
             }
             {
               op: "score"
               params:
                 direction: "up"
-                id: res.body.todos[2].id
+                id: $i(res.body.todos, 2).id
             }
           ]).end (res) ->
             expectCode res, 200
@@ -137,7 +137,7 @@ describe "API", ->
               {
                 op: "updateTask"
                 params:
-                  id: res.body.todos[0].id
+                  id: $i(res.body.todos, 0).id
 
                 body:
                   dateCompleted: moment().subtract("days", 4)
@@ -145,7 +145,7 @@ describe "API", ->
               {
                 op: "updateTask"
                 params:
-                  id: res.body.todos[1].id
+                  id: $i(res.body.todos, 1).id
 
                 body:
                   dateCompleted: moment().subtract("days", 4)
@@ -153,6 +153,7 @@ describe "API", ->
             ]).end (res) ->
               expect(_.size(res.body.todos)).to.be 4
               done()
+
 
     ###*
     GROUPS
@@ -174,14 +175,17 @@ describe "API", ->
       describe "Challenges", ->
         challenge = undefined
         updateTodo = undefined
+        [did, tid] = [shared.uuid(), shared.uuid()]
         it "Creates a challenge", (done) ->
           request.post(baseURL + "/challenges").send(
             group: group._id
             dailys: [
+              id: did,
               type: "daily"
               text: "Challenge Daily"
             ]
             todos: [
+              id: tid,
               type: "todo"
               text: "Challenge Todo"
               notes: "Challenge Notes"
@@ -192,16 +196,14 @@ describe "API", ->
           ).end (res) ->
             expectCode res, 200
             async.parallel [
-              (cb) ->
-                User.findById _id, cb
-              (cb) ->
-                Challenge.findById res.body._id, cb
+              (cb) -> User.findById _id, cb
+              (cb) -> Challenge.findById res.body._id, cb
             ], (err, results) ->
               _user = results[0]
               challenge = results[1]
-              expect(_user.dailys[_user.dailys.length - 1].text).to.be "Challenge Daily"
-              updateTodo = _user.todos[_user.todos.length - 1]
-              expect(updateTodo.text).to.be "Challenge Todo"
+              expect(_user.dailys[did].text).to.be("Challenge Daily")
+              updateTodo = _user.todos[tid]
+              expect(updateTodo.text).to.be.ok("Challenge Todo")
               expect(challenge.official).to.be false
               done()
 
@@ -211,15 +213,15 @@ describe "API", ->
             done() # we'll do the check down below
 
         it "Change challenge daily", (done) ->
-          challenge.dailys[0].text = "Updated Daily"
-          challenge.todos[0].notes = "Challenge Updated Todo Notes"
+          challenge.dailys[did].text = "Updated Daily"
+          challenge.todos[tid].notes = "Challenge Updated Todo Notes"
           request.post(baseURL + "/challenges/" + challenge._id).send(challenge).end (res) ->
             setTimeout (->
               User.findById _id, (err, _user) ->
                 expectCode res, 200
-                expect(_user.dailys[_user.dailys.length - 1].text).to.be "Updated Daily"
-                expect(res.body.todos[0].notes).to.be "Challenge Updated Todo Notes"
-                expect(_user.todos[_user.todos.length - 1].notes).to.be "User overriden notes"
+                expect(_user.dailys[did].text).to.be("Updated Daily")
+                expect(res.body.todos[tid].notes).to.be "Challenge Updated Todo Notes"
+                expect(_user.todos[tid].notes).to.be "User overriden notes"
                 user = _user
                 done()
             ), 500 # we have to wait a while for users' tasks to be updated, called async on server
@@ -231,8 +233,8 @@ describe "API", ->
 
         it "Complete To-Dos", (done) ->
           u = user
-          request.post(baseURL + "/user/tasks/" + u.todos[0].id + "/up").end (res) ->
-            request.post(baseURL + "/user/tasks/" + u.todos[1].id + "/up").end (res) ->
+          request.post(baseURL + "/user/tasks/" + $i(u.todos, 0).id + "/up").end (res) ->
+            request.post(baseURL + "/user/tasks/" + $i(u.todos, 1).id + "/up").end (res) ->
               request.post(baseURL + "/user/tasks/").send(type: "todo").end (res) ->
                 request.post(baseURL + "/user/tasks/clear-completed").end (res) ->
                   expect(_.size(res.body)).to.be 3
@@ -242,20 +244,19 @@ describe "API", ->
           itThis = this
           request.del(baseURL + "/challenges/" + challenge._id).end (res) ->
             User.findById user._id, (err, user) ->
-              len = user.dailys.length - 1
-              daily = user.dailys[user.dailys.length - 1]
+              daily = user.dailys[did]
               expect(daily.challenge.broken).to.be "CHALLENGE_DELETED"
 
               # Now let's handle if challenge was deleted, but didn't get to update all the users (an error)
               unset = $unset: {}
-              unset["$unset"]["dailys." + len + ".challenge.broken"] = 1
+              unset["$unset"]["dailys." + did + ".challenge.broken"] = 1
               User.findByIdAndUpdate user._id, unset, (err, user) ->
                 expect(err).to.not.be.ok()
-                expect(user.dailys[len].challenge.broken).to.not.be.ok()
+                expect(user.dailys[did].challenge.broken).to.not.be.ok()
                 request.post(baseURL + "/user/tasks/" + daily.id + "/up").end (res) ->
                   setTimeout (->
                     User.findById user._id, (err, user) ->
-                      expect(user.dailys[len].challenge.broken).to.be "CHALLENGE_DELETED"
+                      expect(user.dailys[did].challenge.broken).to.be "CHALLENGE_DELETED"
                       done()
                   ), 100 # we need to wait for challenge to update user, it's a background job for perf reasons
 
@@ -277,6 +278,7 @@ describe "API", ->
                 ).end (res) ->
                   expect(res.body.official).to.be false
                   cb()
+
               (cb) ->
                 request.post(baseURL + "/challenges").send(
                   group: group._id
@@ -288,6 +290,7 @@ describe "API", ->
                 ).end (res) ->
                   expect(res.body.official).to.be true
                   cb()
+
             ], done
 
       describe "Quests", ->
@@ -371,6 +374,7 @@ describe "API", ->
                   m.push (cb2) ->
                     request.post(baseURL + "/groups/" + group._id + "/join").set("X-API-User", party[i]._id).set("X-API-Key", party[i].apiToken).end ->
                       cb2()
+
                   m
                 , [])
                 async.series series, cb
@@ -393,12 +397,10 @@ describe "API", ->
                       $set:
                         "items.quests.vice3": 1
                     , cb
-
                 (_user, cb) ->
                   request.post(baseURL + "/groups/" + group._id + "/questAccept?key=vice3").end (res) ->
                     expectCode res, 200
                     Group.findById group._id, cb
-
                 (_group, cb) ->
                   expect(_group.quest.key).to.be "vice3"
                   expect(_group.quest.active).to.be false
@@ -594,6 +596,7 @@ describe "API", ->
                           ], cb2
                       ], cb
                   ], done
+
 
     describe.skip "Subscriptions", ->
       user = undefined

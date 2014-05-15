@@ -1,4 +1,4 @@
-li(bindonce='list', bo-id='"task-"+task.id', ng-repeat='task in obj[list.type+"s"] track by task.id', class='task {{Shared.taskClasses(task, user.filters, user.preferences.dayStart, user.lastCron, list.showCompleted, main)}}', ng-click='spell && castEnd(task, "task", $event)', ng-class='{"cast-target":spell}', popover-trigger='mouseenter', popover-placement='top', popover='{{task.notes}}')
+li(bindonce='list', bo-id='"task-"+task.id', ng-repeat='task in obj[list.type+"s"] track by task.id | toArray | orderBy:"sort"', class='task {{Shared.taskClasses(task, user.filters, user.preferences.dayStart, user.lastCron, list.showCompleted, main)}}', ng-click='spell && castEnd(task, "task", $event)', ng-class='{"cast-target":spell}', popover-trigger='mouseenter', popover-placement='top', popover='{{task.notes}}')
   // right-hand side control buttons
   .task-meta-controls
 
@@ -40,7 +40,7 @@ li(bindonce='list', bo-id='"task-"+task.id', ng-repeat='task in obj[list.type+"s
           span.glyphicon.glyphicon-bullhorn(tooltip=env.t('challenge'))
           | &nbsp;
       // delete
-      a(ng-if='!task.challenge.id', ng-click='removeTask(obj[list.type+"s"], $index)', tooltip=env.t('delete'))
+      a(ng-if='!task.challenge.id', ng-click='removeTask(task)', tooltip=env.t('delete'))
         span.glyphicon.glyphicon-trash
         | &nbsp;
 

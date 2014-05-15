@@ -3,6 +3,10 @@ var Schema = mongoose.Schema;
 var shared = require('habitrpg-shared');
 var _ = require('lodash');
 var TaskSchemas = require('./task');
+var Habit = TaskSchemas.HabitModel,
+  Daily = TaskSchemas.DailyModel,
+  Todo = TaskSchemas.TodoModel,
+  Reward = TaskSchemas.RewardModel
 
 var ChallengeSchema = new Schema({
   _id: {type: String, 'default': shared.uuid},
@@ -10,10 +14,10 @@ var ChallengeSchema = new Schema({
   shortName: String,
   description: String,
   official: {type: Boolean,'default':false},
-  habits:   [TaskSchemas.HabitSchema],
-  dailys:   [TaskSchemas.DailySchema],
-  todos:    [TaskSchemas.TodoSchema],
-  rewards:  [TaskSchemas.RewardSchema],
+  habits:   Schema.Types.Mixed,
+  dailys:   Schema.Types.Mixed,
+  todos:    Schema.Types.Mixed,
+  rewards:  Schema.Types.Mixed,
   leader: {type: String, ref: 'User'},
   group: {type: String, ref: 'Group'},
   timestamp: {type: Date, 'default': Date.now},
@@ -23,9 +27,10 @@ var ChallengeSchema = new Schema({
 });
 
 ChallengeSchema.virtual('tasks').get(function () {
-  var tasks = this.habits.concat(this.dailys).concat(this.todos).concat(this.rewards);
-  var tasks = _.object(_.pluck(tasks,'id'), tasks);
-  return tasks;
+  return shared.refMerge(this.habits, this.dailys, this.todos, this.rewards);
+//  var tasks = this.habits.concat(this.dailys).concat(this.todos).concat(this.rewards);
+//  var tasks = _.object(_.pluck(tasks,'id'), tasks);
+//  return tasks;
 });
 
 ChallengeSchema.methods.toJSON = function(){
@@ -33,6 +38,34 @@ ChallengeSchema.methods.toJSON = function(){
   doc._isMember = this._isMember;
   return doc;
 }
+
+var taskFromArr = function(arr){
+  return _.reduce(arr, function(m,v){
+    var task = new {habit:Habit,daily:Daily,todo:Todo,reward:Reward}[v.type](v);
+    m[task.id] = task; return m;
+  }, {});
+}
+ChallengeSchema.pre('validate',function(next){
+  var that = this;
+  _.each(['habits','dailys','todos','rewards'], function(type){
+    if (_.isArray(that[type])) that[type] = taskFromArr(that[type]);
+  })
+  next();
+})
+
+//ChallengeSchema.pre('validate',function(next){
+//  console.log(this);
+//})
+
+ChallengeSchema.pre('save',function(next){
+  var self = this;
+  _.each({habits:Habit,dailys:Daily,todos:Todo,rewards:Reward},function(k,model){
+    _.each(self[k], function(t){
+      t = new model(t);
+    });
+  });
+  next();
+})
 
 // --------------
 // Syncing logic
@@ -51,7 +84,8 @@ function syncableAttrs(task) {
  */
 function comparableData(obj) {
   return JSON.stringify(
-    _(obj.habits.concat(obj.dailys).concat(obj.todos).concat(obj.rewards))
+    _(shared.refMerge(obj.habits,obj.dailys,obj.todos,obj.rewards))
+      .toArray()
       .sortBy('id') // we don't want to update if they're sort-order is different
       .transform(function(result, task){
         result.push(syncableAttrs(task));
@@ -97,18 +131,21 @@ ChallengeSchema.methods.syncToUser = function(user, cb) {
   // Sync new tasks and updated tasks
   _.each(self.tasks, function(task){
     var list = user[task.type+'s'];
-    var userTask = user.tasks[task.id] || (list.push(syncableAttrs(task)), list[list.length-1]);
+    if (!user.tasks[task.id]) list[task.id] = syncableAttrs(task);
+    var userTask = user.tasks[task.id];
     if (!userTask.notes) userTask.notes = task.notes; // don't override the notes, but provide it if not provided
     userTask.challenge = {id:self._id};
     userTask.tags = userTask.tags || {};
     userTask.tags[self._id] = true;
     _.merge(userTask, syncableAttrs(task));
+    user.markModified(task.type+'s');
   })
 
   // Flag deleted tasks as "broken"
   _.each(user.tasks, function(task){
     if (task.challenge && task.challenge.id==self._id && !self.tasks[task.id]) {
-      task.challenge.broken = 'TASK_DELETED';
+      user[task.type+'s'][task.id].challenge.broken = 'TASK_DELETED';
+      user.markModified(task.type+'s.'+task.id);
     }
   })
 

@@ -21,3 +21,4 @@ angular.module('habitrpg')
         (gp > 999) ? (gp / Math.pow(10, 3)).toFixed(1) + "k" : gp;
     }
   })
+  .filter('toArray', function(){return _.toArray})
