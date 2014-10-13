@@ -46,6 +46,10 @@ script(type='text/ng-template', id='partials/options.settings.settings.html')
                 span.hint(popover-trigger='mouseenter', popover-placement='right', popover=env.t('stickyHeaderPop'))=env.t('stickyHeader')
             .checkbox
               label
+                input(type='checkbox', ng-click='toggleBossButton()', ng-checked='user.preferences.bossButton!==false', ng-disabled="user.preferences.bossButton!==false")
+                span.hint(popover-trigger='mouseenter', popover-placement='right', popover=env.t('bossButtonPop'))=env.t('bossButton')
+            .checkbox
+              label
                 input(type='checkbox', ng-model='user.preferences.newTaskEdit', ng-change='set({"preferences.newTaskEdit": user.preferences.newTaskEdit?true: false})')
                 span.hint(popover-trigger='mouseenter', popover-placement='right', popover=env.t('newTaskEditPop'))=env.t('newTaskEdit')
             .checkbox
