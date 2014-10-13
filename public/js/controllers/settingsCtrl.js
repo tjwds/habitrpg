@@ -31,6 +31,13 @@ habitrpg.controller('SettingsCtrl',
       });
       User.set({"preferences.stickyHeader":!User.user.preferences.stickyHeader});
     }
+    
+    $scope.toggleBossButton = function(){
+      $rootScope.$on('userSynced', function(){
+        window.location.reload();
+      });
+      User.set({"preferences.bossButton":!User.user.preferences.bossButton});
+    }
 
     $scope.showTour = function(){
       User.set({'flags.showTour':true});
