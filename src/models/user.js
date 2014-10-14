@@ -265,6 +265,7 @@ var UserSchema = new Schema({
     costume: Boolean,
     sleep: {type: Boolean, 'default': false},
     stickyHeader: {type: Boolean, 'default': true},
+    bossButton: {type: Boolean, 'default': false},
     disableClasses: {type: Boolean, 'default': false},
     newTaskEdit: {type: Boolean, 'default': false},
     tagsCollapsed: {type: Boolean, 'default': false},

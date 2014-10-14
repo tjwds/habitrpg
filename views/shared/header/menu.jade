@@ -79,7 +79,7 @@ nav.toolbar(ng-controller='AuthCtrl', ng-class='{active: isToolbarHidden}')
             li
               a(ui-sref='options.profile.stats')=env.t('stats')
             li
-              a(ui-sref='options.profile.profile')=env.t('profile') 
+              a(ui-sref='options.profile.profile')=env.t('profile')
       li.toolbar-button-dropdown
         a(ui-sref='options.social.tavern')
           span=env.t('social')
@@ -134,7 +134,7 @@ nav.toolbar(ng-controller='AuthCtrl', ng-class='{active: isToolbarHidden}')
     ul.toolbar-subscribe(ng-if='!user.purchased.plan.customerId')
       li.toolbar-subscribe-button
         button(ui-sref='options.settings.subscription',popover-trigger='mouseenter',popover-placement='bottom',popover-title=env.t('subscriptions'),popover=env.t('subDescription'),popover-append-to-body='true')=env.t('subscribe')
-    ul.toolbar-options  
+    ul.toolbar-options
       li.toolbar-notifs
         a(ng-click='expandMenu("notifs")')
           span.glyphicon(ng-class='iconClasses()')
@@ -213,6 +213,9 @@ nav.toolbar(ng-controller='AuthCtrl', ng-class='{active: isToolbarHidden}')
           ul.toolbar-controls
             li.toolbar-controls-button
               a(ng-click='expandMenu(null)')=env.t('close')
+       li.toolbar-bossbutton
+         a(ng-click='hideHeader()')
+           span.glyphicon.glyphicon-eye-close
     ul.toolbar-wallet
       li.toolbar-gems
         a.gem-wallet(ng-click='openModal("buyGems",{track:"Gems > Toolbar"})', popover-trigger='mouseenter', popover-title=env.t('gems'), popover=env.t('gemsWhatFor'), popover-placement='bottom',popover-append-to-body='true')
