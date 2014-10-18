@@ -21,7 +21,7 @@ habitrpg.controller('SettingsCtrl',
         User.set({"preferences.stickyHeader":false});
         $rootScope.$on('userSynced', function(){
           window.location.reload();
-        });           
+        });
       }
     }
 
@@ -31,13 +31,21 @@ habitrpg.controller('SettingsCtrl',
       });
       User.set({"preferences.stickyHeader":!User.user.preferences.stickyHeader});
     }
-    
+
     $scope.toggleBossButton = function(){
       $rootScope.$on('userSynced', function(){
         window.location.reload();
       });
       User.set({"preferences.bossButton":!User.user.preferences.bossButton});
     }
+
+    $scope.toggleHideSpiders = function(){
+      $rootScope.$on('userSynced', function(){
+        window.location.reload();
+      });
+      User.set({"preferences.hideSpiders":!User.user.preferences.hideSpiders});
+    }
+
 
     $scope.showTour = function(){
       User.set({'flags.showTour':true});
